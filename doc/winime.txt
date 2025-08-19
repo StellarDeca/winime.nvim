@@ -1,0 +1,1847 @@
+*winime-cn.txt* 					winime -- 智能的 Neovim 自动输入法切换插件
+
+
+==============================================================================
+CONTENTS                                                    *winime-contents*
+
+	1. Introduction   |winime-intro|
+	2. Installation   |winime-install|
+	3. Configuration  |winime-config|
+	4. Usage          |winime-usage|
+	5. Principle 	  |winime-prin|
+	6. APIS			  |winime-apis|
+	7. FAQ            |winime-faq|
+	8. Future		  |winime-future|
+	9. License        |winime-license|
+
+
+==============================================================================
+1. Introduction												*winime-intro*
+
+	Winime 是一款是一款专为 Neovim 设计的智能输入法切换插件，
+能够根据编辑上下文和编辑模式自动切换系统输入法，提升混合编辑效率。
+
+	核心特性：
+		- 在首次启用时将自动检测可用的系统输入法
+		- 内置了基于 TreeSitter 和 字符串 的语法分析工具
+		- 自动在 Insert 模式与 Normal 模式切换时切换输入法
+		- 在 Insert 模式下自动识别注释区域与代码区域，自动切换输入法
+
+	`winime`要求 Neovim 版本 >= 0.10
+	`winime`并不支持Mac、Linux系统，详情见 6.FAQ
+	`winime`要求Windows系统内至少安装两种及以上系统输入法
+
+==============================================================================
+2. Installation												*winime-install*
+
+        Winime 支持主流 Neovim 包管理器进行插件的管理：
+
+"""lazy.nvim"""
+```lua
+return {
+    "StellarDeca/winime.nvim",
+    opts = {
+        winime_core = {
+            grammer_analysis_mode = "Auto",  -- 可选: "Auto" | "TreeSitter" | "String"
+        },
+    },
+    event = { "VimEnter", "VeryLazy" },
+    dependencies = (function()
+        -- ⚠️ 注意: mode 应与 opts.winime_core.grammer_analysis_mode 一致
+        local mode = "Auto"
+        if mode == "TreeSitter" then
+            return { "nvim-treesitter/nvim-treesitter" }
+        elseif mode == "Auto" then
+            return {
+                "nvim-treesitter/nvim-treesitter",
+                event = { "BufEnter", "BufNewFile" },
+            }
+        end
+        return {}
+    end)(),
+}
+```
+
+==============================================================================
+3.Configuration												*winime-config"
+
+	通过 require("winime").setup(opts) 配置插件，以下为 Winime 的默认配置：
+
+```lua
+require("winime").setup({
+	winime_core = {
+		winime_version = "1.0.0",
+		nvim_version = "0.10.0",
+		notify = true,
+		user_language = "chinese",
+		grammer_analysis_mode = "Auto",
+		method_auto_detect = true,
+	},
+
+	user_config = {
+		nvim_enter_method_change = {
+			max_retry = 50,
+			nvim_enter = true,
+		},
+
+		nvim_insert_mode_change = {
+			insert_enter = true,
+			insert_leave = true,
+		},
+
+		nvim_insert_input_analysis = {
+			max_char_cache = 2000,
+			max_postpone_time = 280,
+			input_analysis = true,
+		},
+
+		nvim_insert_cursor_moved_analysis = {
+			max_postpone_time = 280,
+			cursor_moved_analysis = true,
+		},
+	},
+
+	language = {
+		method_auto_detect_start = "正在初始化输入法区域ID设置,可能需要一些时间...",
+		method_auto_detect_success = "输入法区域ID设置成功",
+		method_auto_detect_error = "输入法区域ID设置失败,请检查系统语言设置",
+		nvim_version_slow = "Neovim版本过低,Winime工作效果可能不理想"
+	},
+
+	input_method = {
+		im_tool_path = "lua/winime/tools/im-select.exe",
+		im_id = {
+			en = 1033,
+			other = 2052,
+		},
+
+		im_candiates_id = {
+			en = {
+				1033, 2057, 3081,
+				4105, 5129, 0,
+			},
+
+			other = {
+				307, 1025, 1028, 1031, 1034,
+				1036, 1037, 1038, 1039, 1040,
+				1041, 1042, 1043, 1044, 1045,
+				1046, 1047, 1048, 1049, 1050,
+				1051, 1052, 1053, 1054, 1055,
+				2052,
+			},
+		},
+	},
+
+	comment_symbols = {
+		lua = {
+			line = { "--" },
+			block = {
+				["--[["] = "]]",
+				["--[=["] = "]=]",
+				["--[==["] = "]==]",
+				["--[===["] = "]===]",
+			},
+			block_is_string = false,
+		},
+
+		python = {
+			line = { "#" },
+			block = {
+				['"""'] = '"""',
+				["'''"] = "'''",
+			},
+			block_is_string = false,
+		},
+
+		c = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+		cpp = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+		java = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+		cs = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+		go = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+		rust = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+		swift = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+
+		javascript = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+		typescript = {
+			line = { "//" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+
+		sh = {
+			line = { "#" },
+			block = {}, -- 无标准多行注释
+			block_is_string = false,
+		},
+		bash = {
+			line = { "#" },
+			block = {},
+			block_is_string = false,
+		},
+		zsh = {
+			line = { "#" },
+			block = {},
+			block_is_string = false,
+		},
+
+		sql = {
+			line = { "--" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+
+		html = {
+			line = {},
+			block = { ["<!--"] = "-->" },
+			block_is_string = false,
+		},
+		xml = {
+			line = {},
+			block = { ["<!--"] = "-->" },
+			block_is_string = false,
+		},
+
+		markdown = {
+			line = {},
+			block = { ["<!--"] = "-->" },
+			block_is_string = false,
+		},
+
+		yaml = {
+			line = { "#" },
+			block = {},
+			block_is_string = false,
+		},
+		toml = {
+			line = { "#" },
+			block = {},
+			block_is_string = false,
+		},
+
+		php = {
+			line = { "//", "#" },
+			block = { ["/*"] = "*/" },
+			block_is_string = false,
+		},
+	}
+}
+
+```
+
+>>>>>
+	winime_core = {
+		winime_version: string
+		nvim_version: string
+		notify: boolean
+		user_language: string
+		grammer_analysis_mode: string
+		method_auto_detect: boolean
+	},
+>>>>>
+
+	在 winime_core 配置中：
+		- winime_version 为 Winime 当前的版本。
+		- nvim_version 为使用 Winime 的最低 Neovim 版本
+		- notify True -> 对 log 消息进行通知（默认只会通知 WARN 与 ERROR 消息）
+		- user_langusge 为 Winime 的语言选项，命名请与 language/*.lua 保持一致
+		- grammer_analysis_mode 为语法分析方式。包含 String、TreeSitter、Auto 三个选项
+		- method_auto_detect True -> 在首次启用时自动检测可用的输入法
+
+>>>>>
+	user_config = {
+		nvim_enter_method_change: table
+		nvim_insert_mode_change: table
+		nvim_insert_input_analysis: table
+		nvim_insert_cursor_moved_analysis: table
+	},
+>>>>>
+
+	在 user_config 配置中：
+		- nvim_enter_method_change NeovimEnter输入法切换功能
+			- max_retry 最大重试次数
+			- nvim_enter 功能开关, bool, True -> 功能开启
+		- nvim_insert_mode_change Insert输入法切换功能
+			- insert_enter 进入插入模式功能开关, ms
+			- insert_leave 离开插入模式功能开关, bool, True -> 功能开启
+		- nvim_insert_input_analysis 输入分析功能,依赖InsertEnter与InsertLeave事件
+			- field max_char_cache 输入分析最大缓存字符数, integer
+			- max_postpone_time 最长延时分析时间, ms
+			- input_analysis 输入分析功能开关, bool, True -> 功能开启
+		- nvim_insert_cursor_moved_analysis
+			- max_postpone_time 最长延时分析时间, ms
+			- cursor_moved_analysis 插入模式光标功能开关, bool, True -> 功能开启
+
+>>>>>
+	language = {
+		nvim_version_slow: string
+		method_auto_detect_start: string
+		method_auto_detect_success: string
+		method_auto_detect_error: string
+	},
+>>>>>
+
+	在 language 配置中：
+		- nvim_version_slow Neovim 版本过低提示语
+		- method_auto_detect_start 自动探测提示语
+		- method_auto_detect_success 自动探测成功提示语
+		- method_auto_detect_error 自动探测失败提示语
+
+>>>>>
+	input_method = {
+		im_tool_path: string
+		im_id: table
+		im_candiates_id: table
+	},
+>>>>>
+
+	在 input_method 配置中：
+		- im_tool_path 输入法切换工具路径
+		- im_id 目标输入法区域ID
+			- en: integer
+			- other: integer
+		- im_candiates_id 备选输入法区域ID，用于自动探测
+			- en: integer[]
+			- other: integer[]
+
+>>>>>
+	comment_symbols = {
+		lua
+		...
+	}
+>>>>>
+
+	在 comment_symbols 配置中：
+		记载了各个编程语言的行注释符号与块注释符号
+		- line: string[]
+		- block: { start_symbol = end_symbol }
+		- block_is_string: bool
+		其中 block_is_string True -> 将会把块注释符号视为字符串
+				不再执行输入法切换（仅限String模式以及TreeSitter的String部分生效）
+
+==============================================================================
+4. Usage          											*winime-usage*
+
+	Winime 将会在 Neovim 启动时自动将输入法切换为英文输入法。
+    	+----------------------------------------------------+
+    	| Any Input Method  --------->  English Input Method |
+    	+----------------------------------------------------+
+
+	在进入 Insert 模式时会根据代码文件的语法状态：
+    	+----------------------------------------------------+
+		|					Comment --> Other Input Method   |
+		| Any Input Method  ------>  						 |
+		|					Code 	--> English Input Method |
+    	+----------------------------------------------------+
+
+	在 Inset 模式下进行文字输入与光标移动,当光标位置语法状态发生变更时：
+    	+----------------------------------------------------+
+		|					Comment --> Other Input Method   |
+		| Any Input Method  ------>  						 |
+		|					Code 	--> English Input Method |
+    	+----------------------------------------------------+
+
+	在退出 Insert 模式时，将自动切换输入法为英文输入法
+    	+----------------------------------------------------+
+    	| Any Input Method  --------->  English Input Method |
+    	+----------------------------------------------------+
+
+	在使用中可以使用用户命令
+		:WinimeReload 重新载入 Winime 插件。
+			注意，如果method_auto_detect = true，将会触发输入法区域ID的自动探测
+
+		:WinimeUnload 卸载 Winime 插件。
+			同时自定义命令:WinimeReload与:WinimeUnload也将会被一并卸载
+
+		:WinimeFileTypeAvaliable 查看 Winime 的 文件支持类型
+
+	当文件类型不支持时，Winime 仅仅保留了 Insert 模式离开切换输入法的功能
+    	+----------------------------------------------------+
+    	| Insert Leave  --------->  English Input Method    |
+    	+----------------------------------------------------+
+
+==============================================================================
+5. Principle 	  											*winime-prin*
+
+	Winime 使用基于 TreeSitter （依赖nvim-treesitter插件）与 StringAnalysis 字符串分析 的文件语法分析。
+
+	Winime 的项目结构如下：
+    │  .editorconfig
+    │  .gitattributes
+    │  .gitignore
+    │  .luarc.json
+    │  .nvim.lua
+    │  LICENSE
+    │  README.md
+    │  README_EN.md
+    │  stylua.toml
+    │  WinimeArtFont.png
+    │  WinimeTeach.gif
+    │
+    ├─.idea
+    │  │  misc.xml
+    │  │  vcs.xml
+    │  │  workspace.xml
+    │  │
+    │  └─inspectionProfiles
+    │          profiles_settings.xml
+    │          Project_Default.xml
+    │
+    ├─doc
+    │      tags
+    │      winime.txt
+    │      winime_en.txt
+    │
+    ├─LICENSES
+    │  └─im-select
+    │          LICENSE
+    │
+    ├─lua
+    │  └─winime
+    │      │  init.lua
+    │      │
+    │      ├─apis
+    │      │      method_auto_detect.lua
+    │      │      string_comment_detect.lua
+    │      │      string_input_intent.lua
+    │      │      tree_sitter_comment_detect.lua
+    │      │
+    │      ├─autocmds
+    │      │      string_analysis_listen.lua
+    │      │      tree_sitter_analysis_liten.lua
+    │      │      winime_autocmds.lua
+    │      │
+    │      ├─config
+    │      │      winime.lua
+    │      │
+    │      ├─language
+    │      │      chinese.lua
+    │      │
+    │      ├─space
+    │      │      orchestrator_runtime.lua
+    │      │      string_analysis_runtime.lua
+    │      │      tree_sitter_anslysis_runtime.lua
+    │      │
+    │      └─tools
+    │              files.lua
+    │              im-select.exe
+    │              logger.lua
+    │              method.lua
+    │              string.lua
+    │
+    ├─plugin
+    │      init.lua
+    │
+    └─test
+            test.lua
+
+	其中plugin/init.lua文件创建 Winime 的用户自定义命令。
+
+	lua/winime/init.lua 为 Winime 启动文件。
+
+	lua/config/*.lua 提供了 Winime 的默认配置。
+	lua/language/*.lua 提供了 Winime config 的 提示语。
+
+	lua/winime/autocmds 提供了 Winime 的自动命令的注册与回调，包括：
+	+---------------------------------------------------------------------------+
+	│	winime_autocmds.lua 自动命令回调事件协调器、自动命令注册方法			│
+	│ 	string_analysis_listen.lua 字符串分析自动命令回调方法				    │
+	│	tree_sitter_analysis_liten.lua TreeSitter分析自动命令回调方法			│
+	+---------------------------------------------------------------------------+
+
+	lua/winime/apis 提供了 Winime 的分析方法，包括：
+	+---------------------------------------------------------------------------+
+	│ 	method_auto_detect.lua 输入法区域ID自动探测方法						    │
+	│	string_comment_detect.lua 文件字符串语法分析方法						│
+	│	string_input_intent.lua 文件内容输入、光标移动字符串语法分析方法		│
+	│	tree_sitter_comment_detect.lua 文件 TreeSitter 语法分析方法				│
+	+---------------------------------------------------------------------------+
+
+	lua/winime/space 提供了 Winime 运行的数据缓存，包含：
+	+---------------------------------------------------------------------------+
+	│	orchestrator_runtime.lua 自动命令协调器缓存数据							│
+	│	string_analysis_runtime.lua String 分析模式的缓存数据					│
+	│	tree_sitter_analysis_runtime.lua TreeSitter 分析模式的缓存数据			│
+	+---------------------------------------------------------------------------+
+
+	lua/winime/tools 提供了 Winime 的底层工具，包括：
+	+---------------------------------------------------------------------------+
+	│	files.lua 文件操作工具													│
+	│	logger.lua 日志工具														│
+	│	method.lua 输入法工具													│
+	│	string.lua 字符串														│
+	│	im-select.exe 输入法命令执行工具										│
+	+---------------------------------------------------------------------------+
+
+	Winime 通过:
+		监听VimEnter 事件在启动是提供输入法切换服务.
+
+		监听CursorMoved 事件追踪光标位置.
+
+		监听 InsertEnter 事件对runtime cache进行初始化并
+			提供针对光标位置文件语法状态的输入法切换服务。
+
+		监听 TextChangedI 与 CursorMovedI 追踪 Insert 模式下文件内容与光标位置的变化，
+			提供针对光标位置文件语法状态的输入法切换服务。
+
+		监听 InsertLeave 事件即使删除runtime cache并提供输入法切换服务。
+
+		监听 BufEnter， BufNewFile 事件在 grammer_analysis_mode = "Auto" 下自动选择
+			语法分析模式。
+
+	在 Winime 语法分析时，TreeSitter 分析模式 与 String 分析模式 只有一种将会被启用。
+
+	Winime 只会注册一套自动命令，在使用中根据 grammer_analysis_mode 配置，
+		自动为不同文件选择不同分析模式的自动命令回调函数。
+
+	Winime 通过协调器对自动命令回调函数进行管理，保证回调回调函数有序的执行。
+		同时支持对回调函数进行立即触发与延迟触发，方便事件的管理。
+
+==============================================================================
+6. APIS														*winime-apis*
+
+	Winime 注册了以下用户命令：
+		:WinimeReload 重新载入 Winime 插件。
+			同时向setup中传入的 opts = {}，将会忽略所有自定义配置而完全使用默认配置
+			注意，如果method_auto_detect = true，将会触发输入法区域ID的自动探测
+
+		:WinimeUnload 卸载 Winime 插件。
+			同时自定义命令:WinimeReload与:WinimeUnload也将会被一并卸载
+
+		:WinimeFileTypeAvaliable 查看 Winime 的 文件支持类型
+
+
+(1).lua/winime/tools:										*winime-tools*
+-----====================================================================-----
+
+method.lua
+------------------------------------------------------------------------------
+	method.im_cmd(tool_path, tar_id) -> vim.SystemCompleted
+
+	| Name 		| Type   		 | Description
+	|-------------------------------------------------------------
+	| tool_path | string 		 | im-select.exe工具路径
+	|
+	| tar_id 	| integer or nil | 目标输入法ID
+
+	调用im-select.exe执行输入法命令
+
+	返回vim.system(cmd)的执行结果。
+		当tar_id为nil时，返回当前的输入法区域ID
+		tar_id不为nil时，不返回结果
+		在执行命令中出错时将会返回错误信息
+
+------------------------------------------------------------------------------
+	method.get_input_method(tool_path) -> integer | nil
+
+	| Name 		| Type   | Description
+	|-------------------------------------------------------------
+	| tool_path | string | im-select.exe工具路径
+
+	获取当前的输入法区域ID
+
+	返回当前的输入法区域ID，如果执行获取命令中出错，则返回nil
+
+------------------------------------------------------------------------------
+	method.change_input_method(tool_path, tar_id) -> boolean
+
+	| Name 		| Type    | Description
+	|-------------------------------------------------------------
+	| tool_path | string  | im-select.exe工具路径
+	|
+	| tar_id 	| integer | 目标输入法ID
+
+	切换输入法至制定的区域ID
+
+	输入法切换成功则返回True，切换失败返回False。
+
+------------------------------------------------------------------------------
+	method.check_im_tool_exists(tool_path) -> boolean
+
+	| Name 		| Type   | Description
+	|-------------------------------------------------------------
+	| tool_path | string | im-select.exe工具路径
+
+	返回im-select.exe工具的存在性。存在-> True；不存在-> Flaes
+
+------------------------------------------------------------------------------
+
+
+files.lua
+------------------------------------------------------------------------------
+	files.filetype_available(ft_available) -> boolean
+
+	| Name 		   | Type   			| Description
+	|-------------------------------------------------------------
+	| ft_available | table<string, any> | 符号配置表
+
+	判断当前文件类型是否存在于符号配置表中：
+		存在，文件可用 -> True
+		不存在，文件不可用 -> Flase
+
+------------------------------------------------------------------------------
+	files.filetype_deny(ft_deny) -> boolean
+
+	| Name 	  | Type     	  | Description
+	|-------------------------------------------------------------
+	| ft_deny | table<string> | 排除文件配置表
+
+	判断当前文件类型是否存在于排除文件配置表中：
+		存在，文件可用 -> True
+		不存在，文件不可用 -> Flase
+
+------------------------------------------------------------------------------
+	files.read_lua_file(cache_path) -> table
+
+	| Name 	  	 | Type   | Description
+	|-------------------------------------------------------------
+	| cache_path | string | 文件路径
+
+	读取并运行制定lua文件，返回lua文件的导出表。
+		如果lua文件不存在或没有导出表，返回空表
+
+------------------------------------------------------------------------------
+	files.save_lua_file(cache_path, data) -> nil
+
+	| Name 	  	 | Type   | Description
+	|-------------------------------------------------------------
+	| cache_path | string | 文件路径
+	|
+	| data       | table  | 数据表
+
+	将数据表写入lua文件保存为：return data 的样式。
+		没有返回值
+------------------------------------------------------------------------------
+
+
+string.lua
+------------------------------------------------------------------------------
+	string.remove_extra_escapes(line_text) -> string
+
+	| Name 	  	| Type   | Description
+	|-------------------------------------------------------------
+	| line_text | string | 行文本
+
+	处理字符中的多重转义,将多余的转义字符替换为空格
+		返回处理后的行字符串。
+
+------------------------------------------------------------------------------
+	string.del_escape_quotes(line_text) -> string
+
+	| Name 	  	| Type   | Description
+	|-------------------------------------------------------------
+	| line_text | string | 行文本
+
+	删除字符串中的转义引号,传入的line_text需要经过转义去重
+		返回处理后的行字符串。
+
+------------------------------------------------------------------------------
+	string.replace_quotes_to_space(line_text) -> string
+
+	| Name 	  	| Type   | Description
+	|-------------------------------------------------------------
+	| line_text | string | 行文本
+
+	将传入字符串内的引号内的内容替换为等长空字符
+		返回处理后的行字符串。
+
+------------------------------------------------------------------------------
+	string.replace_line_comment_to_space(line_text, line_symbols, overlapping) -> string
+
+	| Name 	  	   | Type   	   | Description
+	|-------------------------------------------------------------
+	| line_text    | string        | 行文本
+	|
+	| line_symbols | table<string> | 行注释符号
+	|
+	| overlapping  | table<string> | 行注释符号重叠符号表
+
+	根据传入的待匹配符号将单行注释排除,同时避免包含导致的错误判断
+	将单行注释替换为相同长度的空字符
+		返回处理后的行字符串。
+
+------------------------------------------------------------------------------
+	string.in_unclosed_qutoe(index, line_text) -> boolean
+
+	| Name 		| Type    | Description
+	|-------------------------------------------------------------
+	| index     | integer | line_text的1基索引
+	|
+	| line_text | string  | 行文本
+
+	判断制定字符串位置是否在未闭合的字符串(也就是单个引号的下文,只看单行)(最好经过引号配对去除,否则影响结果)
+	边界不包含index的位置,只匹配到index的前一个符号
+		在未闭合的字符串内 -> True
+		不在未闭合的字符串内 -> Flase
+
+------------------------------------------------------------------------------
+
+
+logger.lua
+------------------------------------------------------------------------------
+	logger._notify = true 默认开启日志通知
+	logger._level = "INFO" 日志级别默认为INFO
+	logger._max_size_bytes = 4MB 默认日志文件最大为4MB
+	logger._log_dir = ~/AppData/Local/nvim-data/winime 默认日志文件路径
+	logger._log_file = winime/winime.log 默认日志文件名
+	logger.levels = { ERROR = 1, WARN = 2, INFO = 3, DEBUG = 4 } 默认日志等级对照表
+
+------------------------------------------------------------------------------
+	logger.set_level(level) -> nil
+
+	| Name 	| Type    								| Description
+	|-------------------------------------------------------------
+	| level | "ERROR" or "INFO" or "WARN" or "DEBUG"| 日志级别
+
+	设置日志级别，无返回值
+
+------------------------------------------------------------------------------
+	logger.set_notify(enable) -> nil
+
+	| Name 	 | Type    | Description
+	|-------------------------------------------------------------
+	| enable | boolean | True -> 启用日志通知；Flase -> 禁用日志通知
+
+	设置日志是否通知，无法返回值
+
+------------------------------------------------------------------------------
+	logger.write_log(level, msg, comment, extra) -> nil
+
+	| Name 	    | Type    									   | Description
+	|--------------------------------------------------------------------
+	| level 	| nil or "ERROR" or "INFO" or "WARN" or "DEBUG"| 日志级别
+	|
+	| msg   	| string 									   | 消息文本
+	|
+	| component | string 									   | 组件名
+	|
+	| extra 	| any 										   | 额外日志内容
+
+	将日志内容写入日志文件，不提供日志级别则使用默认日志级别
+		无返回值
+
+
+(2).lua/winime/space:										*winime-space*
+-----====================================================================-----
+
+
+string_analysis_runtime.lua
+------------------------------------------------------------------------------
+    RunTime.init_input_cache(win, grammer_state, grammer_info, grammer_position, first_insert_enter) -> nil
+
+    | Name                 | Type    | Description
+	|-------------------------------------------------------------
+    | win                  | integer | 窗口ID
+    | grammer_state        | string  | 语法状态（"code"、"line" 或 "block"）
+    | grammer_info         | table   | 语法信息
+    | grammer_position     | table   | 语法位置
+    | first_insert_enter   | boolean | 是否首次进入插入模式
+
+    初始化指定窗口的输入缓存。
+
+------------------------------------------------------------------------------
+    RunTime.get_input_cache(win) -> table
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    返回指定窗口的输入缓存表，包含输入历史、语法状态等信息。
+
+------------------------------------------------------------------------------
+    RunTime.del_input_cache(win) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    删除指定窗口的输入缓存。
+
+------------------------------------------------------------------------------
+	RunTime.init_symbol_cache(win, symbols) -> nil
+
+    | Name 	  | Type    | Description
+    |-------------------------------------------
+    | win     | integer | 窗口ID
+	| symbols | table 	| 符号配置表，包含行注释、块注释符号
+
+	初始化symbols缓存数据表，无返回值
+
+------------------------------------------------------------------------------
+    RunTime.get_symbol_cache(win) -> table
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    返回指定窗口的符号缓存表，包含注释符号等信息。
+
+------------------------------------------------------------------------------
+    RunTime.del_symbols_cache(win) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    删除指定窗口的符号缓存。
+
+------------------------------------------------------------------------------
+	RunTime.init_cursor_cache(win, mode) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+    | mode | string  | 模式（"n" 或 "i"，可选）
+
+	初始化cursor缓存表
+
+------------------------------------------------------------------------------
+    RunTime.get_cursor_cache(win, mode) -> table
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+    | mode | string  | 模式（"n" 或 "i"，可选）
+
+    返回指定窗口的光标缓存表，包含不同模式下的光标位置信息。
+
+------------------------------------------------------------------------------
+    RunTime.set_cursor_cache(win, mode) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+    | mode | string  | 模式（"n" 或 "i"）
+
+    更新并设置指定窗口指定模式下的光标缓存。
+
+------------------------------------------------------------------------------
+    RunTime.del_cursor_cache(win) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    删除指定窗口的光标缓存。
+
+------------------------------------------------------------------------------
+    RunTime.get_runtime_cache() -> table
+
+    返回运行时缓存表，包含各窗口的相关缓存信息。
+
+
+tree_sitter_anslysis_runtime.lua
+------------------------------------------------------------------------------
+	RunTime.init_cursor_cache(win, mode) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+    | mode | string  | 模式（"n" 或 "i"，可选）
+
+	初始化cursor缓存表
+
+------------------------------------------------------------------------------
+    RunTime.set_cursor_cache(win, mode) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+    | mode | string  | 模式（"n" 或 "i"）
+
+    更新并设置指定窗口指定模式下的光标缓存。
+
+------------------------------------------------------------------------------
+    RunTime.get_cursor_cache(win, mode) -> table
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+    | mode | string  | 模式（"n" 或 "i"，可选）
+
+    返回指定窗口的光标缓存表，包含不同模式下的光标位置信息。
+
+------------------------------------------------------------------------------
+    RunTime.del_cursor_cache(win) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    删除指定窗口的光标缓存。
+
+------------------------------------------------------------------------------
+    RunTime.init_symbol_cache(win, comment_symbols) -> nil
+
+    | Name             | Type    | Description
+    |-------------------------------------------
+    | win              | integer | 窗口ID
+    | comment_symbols  | table   | 注释符号表
+
+    初始化指定窗口的符号缓存。
+
+------------------------------------------------------------------------------
+    RunTime.get_symbol_cache(win) -> table
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    返回指定窗口的符号缓存表，包含注释符号等信息。
+
+------------------------------------------------------------------------------
+    RunTime.del_symbols_cache(win) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    删除指定窗口的符号缓存。
+
+------------------------------------------------------------------------------
+    RunTime.init_ts_cache(win, file_ticked, root_node, in_comment, grammer_range) -> nil
+
+    | Name           | Type    | Description
+    |-------------------------------------------
+    | win            | integer | 窗口ID
+    | file_ticked    | integer | 文件更改标记
+    | root_node      | table   | 根节点
+    | in_comment     | boolean | 是否在注释内
+    | grammer_range  | table   | 语法范围
+
+    初始化指定窗口的TreeSitter缓存。
+
+------------------------------------------------------------------------------
+    RunTime.get_ts_cache(win) -> table
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    返回指定窗口的TreeSitter缓存表。
+
+------------------------------------------------------------------------------
+    RunTime.del_ts_cache(win) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    删除指定窗口的TreeSitter缓存。
+
+------------------------------------------------------------------------------
+    RunTime.init_method_cache(win, in_comment, in_sync) -> nil
+
+    | Name       | Type    | Description
+    |-------------------------------------------
+    | win        | integer | 窗口ID
+    | in_comment | boolean | 是否在注释内
+    | in_sync    | boolean | 是否同步
+
+    初始化指定窗口的输入法状态缓存。
+
+------------------------------------------------------------------------------
+    RunTime.get_method_cache(win) -> table
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    返回指定窗口的输入法状态缓存表。
+
+------------------------------------------------------------------------------
+    RunTime.set_method_cache(win, in_comment, in_sync) -> nil
+
+    | Name       | Type    | Description
+    |-------------------------------------------
+    | win        | integer | 窗口ID
+    | in_comment | boolean | 是否在注释内
+    | in_sync    | boolean | 是否同步（可选）
+
+    更新并设置指定窗口的输入法状态缓存。
+
+------------------------------------------------------------------------------
+    RunTime.del_method_cache(win) -> nil
+
+    | Name | Type    | Description
+    |-------------------------------------------
+    | win  | integer | 窗口ID
+
+    删除指定窗口的输入法状态缓存。
+
+------------------------------------------------------------------------------
+    RunTime.get_runtime_cache() -> table
+
+    返回运行时缓存表，包含各窗口的相关缓存信息。
+
+
+space/orchestrator_runtime.lua
+------------------------------------------------------------------------------
+	F.init_orc_cache(win) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	初始化指定窗口的协调器缓存表。
+
+------------------------------------------------------------------------------
+	F.get_orc_cache(win) -> orc_cache
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	获取指定窗口的协调器缓存表。如果不存在，则初始化后返回。
+
+------------------------------------------------------------------------------
+	F.set_orc_timer(win, key, max_time, callback, args) -> nil
+
+	| Name      | Type     | Description
+	|-----------------------------------
+	| win       | integer  | 窗口ID
+	| key       | string   | 计时器标识键
+	| max_time  | number   | 最大等待时间（毫秒）
+	| callback  | function | 回调函数
+	| args      | table    | 回调函数的参数表（可选）
+
+	为指定窗口设置一个计时器，超时后执行回调函数。
+
+------------------------------------------------------------------------------
+	F.stop_orc_timer(win, key) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| key  | string  | 计时器标识键
+
+	停止指定窗口的特定计时器。
+
+------------------------------------------------------------------------------
+	F.stop_orc_timer_all(win) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	停止指定窗口的所有计时器。
+
+------------------------------------------------------------------------------
+	F.del_orc_timer(win, key) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| key  | string  | 计时器标识键
+
+	从缓存中删除指定窗口的特定计时器（不停止计时器）。
+
+------------------------------------------------------------------------------
+	F.del_orc_cache(win) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	清除指定窗口的协调器缓存（包括所有计时器和事件）。
+
+------------------------------------------------------------------------------
+
+
+(3).lua/winime/apis:										*winime-apis*
+-----====================================================================-----
+
+method_auto_detect.lua
+------------------------------------------------------------------------------
+	F.auto_get_input_method(im_candiates_id, im_tool_path) -> boolean, table
+
+	| Name 			   | Type    							 | Description
+	|---------------------------------------------------------------------------
+	| im_candiates_id  | { en: integer[], other: integer[] } | 候选输入法ID表
+	| im_tool_path	   | string  							 | im-select工具路径
+
+	自动检测输入法区域ID
+	True -> 返回成功, 返回探测结果， Flase -> 检测失败
+
+
+string_comment_detect.lua
+------------------------------------------------------------------------------
+    F.comment_detect_line(win) -> table, table
+
+	| Name  | Type    | Description
+	|-------------------------------------------
+	| win   | integer | 窗口ID
+
+	对文件内容进行单行语法语法分析
+
+	返回单行注释检测结果及匹配列表。
+		第一个返回值为检测结果表，包含：
+			grammer_state: 语法状态（"line" 或 "code"）
+			grammer_position: 语法位置（包含row和col的表）
+			grammer_info: 语法信息（包含symbol、complete、pairs的表，可能为nil）
+		第二个返回值为匹配列表，包含所有符合条件的注释符号信息
+
+------------------------------------------------------------------------------
+    F.comment_detect_block(win) -> table, table
+
+	| Name  | Type    | Description
+	|-------------------------------------------
+	| win   | integer | 窗口ID
+
+	对文件内容进行块注释语法分析
+
+	返回块注释检测结果及匹配列表。
+		第一个返回值为检测结果表，包含：
+			grammer_state: 语法状态（"block" 或 "code"）
+			grammer_position: 语法位置（包含row和col的表）
+			grammer_info: 语法信息（包含symbol、complete、pairs的表，可能为nil）
+		第二个返回值为匹配列表，包含所有符合条件的块注释符号信息
+
+------------------------------------------------------------------------------
+	F.comment_detect_string_analysis(win) -> table
+
+	| Name  | Type    | Description
+	|-------------------------------------------
+	| win   | integer | 窗口ID
+
+	对文件全文进行语法分析，判断光标位置是否在注释块内
+
+	返回Buf注释块检测结果表，包含：
+		grammer_state: 语法状态（"block" 或 "code"）
+		grammer_position: 语法位置（包含row和col的表）
+		grammer_info: 语法信息（包含symbol、complete、pairs的表，可能为nil）
+
+------------------------------------------------------------------------------
+
+
+string_input_intent.lua
+------------------------------------------------------------------------------
+    F.track_insert_changes(win) -> table
+
+	| Name  | Type    | Description
+	|-------------------------------------------
+	| win   | integer | 窗口ID
+
+	根据光标位置变化捕获字符输入
+
+	返回输入变化信息表，包含：
+		del_beyond_history_range: 是否删除超出历史范围（boolean）
+		char_removed: 是否有字符删除（boolean）
+		char_insert: 是否有字符插入（boolean）
+
+------------------------------------------------------------------------------
+    F.trim_insert_history(win, max_history_len) -> nil
+
+	| Name             | Type    | Description
+	|-------------------------------------------
+	| win              | integer | 窗口ID
+	| max_history_len  | integer | 最大历史记录长度
+
+	当缓存表长度超过设定的最大长度时，删除缓存中前30%的数据
+
+------------------------------------------------------------------------------
+    F.insert_input_analysis(win, max_history_len) -> table
+
+	| Name             | Type    | Description
+	|-------------------------------------------
+	| win              | integer | 窗口ID
+	| max_history_len  | integer | 最长输入缓存字符数
+
+	对输入内容进行语法分析，更新当前光标位置的语法状态
+
+	返回输入分析结果表，包含：
+		match: 是否匹配成功（boolean）
+		grammer_state: 语法状态（"block" | "code" | "line"）
+		grammer_position: 语法位置（包含row和col的表）
+		grammer_info: 语法信息（包含symbol和pairs的表，可能为nil）
+		失败时语法信息为缓存的语法信息，成功时为更新后的语法信息
+
+------------------------------------------------------------------------------
+	F.insert_cursor_moved_analysis(win) -> boolean, table
+
+	| Name  | Type    | Description
+	|-------------------------------------------
+	| win   | integer | 窗口ID
+
+	处理 Insert 模式下的非插入字符导致的光标移动
+	对runtime中缓存的输入字符进行删除于撤销，再必要时标记需要全文语法分析
+
+	返回光标移动结果与分析表，包含：
+		1.need_comment_detect：是否需要对全文进行语法分析
+		2.result: 分析结果表
+			- cursor_moved: boolean 光标移动状态标志
+			- moved_beyond_history_range: boolean 光标移动范围标志
+			- reason：string 结果判断原因
+
+------------------------------------------------------------------------------
+
+
+tree_sitter_comment_detect.lua
+------------------------------------------------------------------------------
+    F.cmp_pos(r1, c1, r2, c2) -> integer
+
+	| Name  | Type    | Description
+	|-------------------------------------------
+	| r1    | integer | 第一个位置的行号
+	| c1    | integer | 第一个位置的列号
+	| r2    | integer | 第二个位置的行号
+	| c2    | integer | 第二个位置的列号
+
+	比较传入的坐标的位置
+
+	判断给定位置(r1, c1)与(r2, c2)的位置关系。
+		返回-1表示(r1, c1)在(r2, c2)左侧
+		返回1表示(r1, c1)在(r2, c2)右侧
+		返回0表示两位置相等
+
+------------------------------------------------------------------------------
+    F.error_node_string_analysis(win, error_node) -> table[]
+
+	| Name        | Type    | Description
+	|-------------------------------------------
+	| win         | integer | 窗口ID
+	| error_node  | TSNode  | 语法错误节点
+
+	对Error节点内的文本进行注释符号分析
+
+	返回注释范围信息表数组。
+		每个表包含：
+			start_row: 起始行号
+			start_col: 起始列号
+			end_row: 结束行号
+			end_col: 结束列号
+
+------------------------------------------------------------------------------
+    F.comment_node_analysis(comment_node) -> table
+
+	| Name          | Type    | Description
+	|-------------------------------------------
+	| comment_node  | TSNode  | 注释节点
+
+	对注释节点进行分析
+
+	返回其范围信息表，包含：
+		start_row: 起始行号
+		start_col: 起始列号
+		end_row: 结束行号
+		end_col: 结束列号
+
+------------------------------------------------------------------------------
+    F.cursor_in_comment_range(win, comment_range) -> boolean, table or nil
+
+	| Name           | Type    | Description
+	|-------------------------------------------
+	| win            | integer | 窗口ID
+	| comment_range  | table[] | 注释范围信息表数组，每个表包含start_row、start_col、end_row、end_col
+
+	比对光标位置与注释范围，判断光标位置是否在注释块内
+
+	判断光标是否在给定的注释范围内。
+		第一个返回值为是否在注释内（boolean）
+		第二个返回值为光标所在的注释范围信息表（包含start_row、start_col、end_row、end_col），不在注释内时为nil
+
+------------------------------------------------------------------------------
+    F.comment_detect_tree_sitter_analysis(win, root_node) -> boolean, TSNode, table or nil
+
+	| Name      | Type     | Description
+	|-------------------------------------------
+	| win       | integer  | 窗口ID
+	| root_node | TSNode or nil | 语法树根节点，为nil时自动获取
+
+	对文件语法树进行分析，判断光标位置是否在注释块内。
+		第一个返回值为是否在注释内（boolean）
+		第二个返回值为语法树根节点（TSNode）
+		第三个返回值为光标所在的注释范围信息表（包含start_row、start_col、end_row、end_col），不在注释内时为nil
+
+------------------------------------------------------------------------------
+
+
+(4)lua/winime/autocmds:										*winime-autocmds*
+-----====================================================================-----
+
+
+string_analysis_listen.lua
+------------------------------------------------------------------------------
+	Orc.immediate_callback["VimEnter"](win, opts) -> nil
+
+	| Name        | Type    | Description
+	|-------------------------------------------
+	| win         | integer | 窗口ID
+	| opts        | table   | 配置表（需包含 im_tool_path 和 im_id.en）
+
+	Neovim启动时延迟切换为英文输入法（等待初始化完成）。
+
+------------------------------------------------------------------------------
+	Orc.immediate_callback["CursorMoved"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	更新普通模式下的光标位置缓存（标记为 "n" 状态）。
+
+------------------------------------------------------------------------------
+	Orc.immediate_callback["InsertEnter"](win, opts) -> nil
+
+	| Name        | Type    | Description
+	|-------------------------------------------
+	| win         | integer | 窗口ID
+	| opts        | table   | 配置表（需包含 comment_symbols 和 im_id）
+
+	进入插入模式时：
+	1. 初始化符号缓存和输入缓存
+	2. 根据语法分析结果切换输入法（代码区→英文，注释区→其他）
+	3. 记录运行时日志
+
+------------------------------------------------------------------------------
+	Orc.immediate_callback["TextChangedI"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| opts | table   | 配置表（需包含 comment_symbols）
+
+	插入模式下文本变更时：
+	1. 跟踪插入/删除操作
+	2. 更新光标位置和输入缓存状态
+
+------------------------------------------------------------------------------
+	Orc.immediate_callback["InsertLeave"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| opts | table   | 配置表（需包含 im_tool_path 和 im_id.en）
+
+	退出插入模式时：
+	1. 清除输入缓存和符号缓存
+	2. 重置光标状态为普通模式（"n"）
+	3. 强制切换为英文输入法
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["NeedComment"](win) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	注释检测回调函数，当need_comment标记为True时，触发文件语法全文分析功能
+	1. 重新分析光标位置语法状态
+	2. 更新输入缓存的语法信息
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["MethodChangedI"](win, im_tool_path, im_id) -> nil
+
+	| Name         | Type    | Description
+	|-------------------------------------------
+	| win          | integer | 窗口ID
+	| im_tool_path | string  | im-select.exe 路径
+	| im_id        | table   | 输入法ID表（需包含 en 和 other）
+
+	输入法状态同步回调函数
+	仅当需要进行输入法切换时才调用tools/method.lua API
+	- 代码区（"code"）→ 英文
+	- 其他状态 → 非英文
+	记录状态变更日志并重置插入/删除标志
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["TextChangedI"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| opts | table   | 配置表（需包含 max_history_len 和 im_id）
+
+	延迟触发的文本分析：
+	1. 若需重新检测注释则调用 NeedComment
+	2. 执行插入内容语法分析
+	3. 更新光标位置并触发 MethodChangedI
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["CursorMovedI"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| opts | table   | 配置表（需包含 comment_symbols 和 im_id）
+
+	延迟触发光标移动分析
+	插入模式下光标移动时：
+	1. 分析光标移动范围
+	2. 若需重新检测注释则调用 NeedComment
+	3. 记录移动日志并触发 MethodChangedI
+
+------------------------------------------------------------------------------
+
+
+tree_sitter_analysis_liten.lua
+------------------------------------------------------------------------------
+	Orc.immediate_callback["VimEnter"](win, opts) -> nil
+
+	| Name        | Type    | Description
+	|-------------------------------------------
+	| win         | integer | 窗口ID
+	| opts        | table   | 配置表（需包含 im_tool_path 和 im_id.en）
+
+	Neovim启动时延迟切换为英文输入法（等待初始化完成）。
+
+------------------------------------------------------------------------------
+	Orc.immediate_callback["CursorMoved"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	更新普通模式下的光标位置缓存（标记为 "n" 状态）。
+
+------------------------------------------------------------------------------
+	Orc.immediate_callback["InsertEnter"](win, opts) -> nil
+
+	| Name        | Type    | Description
+	|-------------------------------------------
+	| win         | integer | 窗口ID
+	| opts        | table   | 配置表（需包含 comment_symbols 和 im_id）
+
+	进入插入模式时：
+	1. 初始化符号缓存、TreeSitter 缓存和方法缓存
+	2. 通过 TreeSitter 检测注释状态并切换输入法（注释区→非英文，代码区→英文）
+	3. 记录运行时日志
+
+------------------------------------------------------------------------------
+	Orc.immediate_callback["InsertLeave"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| opts | table   | 配置表（需包含 im_tool_path 和 im_id.en）
+
+	退出插入模式时：
+	1. 清除所有缓存（TS 缓存、方法缓存、符号缓存）
+	2. 重置光标状态为普通模式（"n"）
+	3. 强制切换为英文输入法
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["NeedComment"](win) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	注释检测回调函数，当文件内容发生变更时，触发文件语法全文分析功能
+	1. 通过 TreeSitter 重新分析语法状态
+	2. 更新 TS 缓存和方法缓存
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["MethodChangedI"](win, im_tool_path, im_id) -> nil
+
+	| Name         | Type    | Description
+	|-------------------------------------------
+	| win          | integer | 窗口ID
+	| im_tool_path | string  | im-select.exe 路径
+	| im_id        | table   | 输入法ID表（需包含 en 和 other）
+
+	输入法状态同步回调函数
+	根据 TS 缓存状态同步输入法：
+	仅当需要进行输入法切换时才调用tools/method.lua API
+	- 代码区（"code"）→ 英文
+	- 注释区（"comment"）→ 非英文
+	记录状态变更日志并重置同步标志
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["TextChangedI"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| opts | table   | 配置表（需包含 comment_symbols 和 im_id）
+
+	延迟触发的文本变更处理：
+	1. 若文件未修改，复用现有 TS 节点检测注释状态
+	2. 若文件已修改，触发 NeedComment 重新分析
+	3. 更新光标位置并触发 MethodChangedI
+
+------------------------------------------------------------------------------
+	Orc.schedule_callback["CursorMovedI"](win, opts) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+	| opts | table   | 配置表（需包含 comment_symbols 和 im_id）
+
+	插入模式下光标移动时：
+	1. 检测是否移出当前注释范围
+	2. 若移出或文件已修改，触发 NeedComment 重新分析
+	3. 记录日志并触发 MethodChangedI
+
+------------------------------------------------------------------------------
+
+
+winime_autocmds.lua
+------------------------------------------------------------------------------
+	F.nvim_buf_enter_listen(winime) -> nil
+
+	| Name      | Type  | Description
+	|-------------------------------------------
+	| winime    | table | 核心配置表（需包含 grammer_analysis_mode 字段）
+
+	根据配置选择语法分析模式：
+	- "String"：强制使用字符串分析
+	- "TreeSitter"：强制使用 TreeSitter 分析
+	- "Auto"：自动检测可用性（优先 TreeSitter）
+
+------------------------------------------------------------------------------
+	F.nvim_enter_listen(max_time, im_id, im_tool_path) -> nil
+
+	| Name         | Type               | Description
+	|-------------------------------------------
+	| max_time     | number             | 最大延迟时间（毫秒）
+	| im_id        | { en: integer, ... } | 输入法ID映射表
+	| im_tool_path | string             | im-select.exe 路径
+
+	Neovim 启动时延迟切换为英文输入法（通过 VimEnter 事件触发）。
+
+------------------------------------------------------------------------------
+	F.nvim_normal_cursor_moved_listen() -> nil
+
+	监听普通模式下的光标移动事件（CursorMoved），更新光标位置缓存。
+
+------------------------------------------------------------------------------
+	F.nvim_insert_enter_listen(comment_symbols, im_id, im_tool_path) -> nil
+
+	| Name            | Type               | Description
+	|-------------------------------------------
+	| comment_symbols | table              | 文件类型注释符号表
+	| im_id           | { en: integer, ... } | 输入法ID映射表
+	| im_tool_path    | string             | im-select.exe 路径
+
+	进入插入模式时（InsertEnter）：
+	1. 初始化语法分析缓存
+	2. 根据光标位置切换输入法
+
+------------------------------------------------------------------------------
+	F.nvim_insert_input_analysis_listen(comment_symbols, max_history_len, max_time, im_id, im_tool_path) -> nil
+
+	| Name            | Type               | Description
+	|-------------------------------------------
+	| comment_symbols | table              | 文件类型注释符号表
+	| max_history_len | integer            | 输入历史最大长度
+	| max_time        | number             | 延迟分析时间（毫秒）
+	| im_id           | { en: integer, ... } | 输入法ID映射表
+	| im_tool_path    | string             | im-select.exe 路径
+
+	插入模式下文本变更时（TextChangedI）：
+	1. 延迟触发语法分析（防抖）
+	2. 根据分析结果切换输入法
+
+------------------------------------------------------------------------------
+	F.nvim_insert_cursor_moved_liten(comment_symbols, max_time, im_id, im_tool_path) -> nil
+
+	| Name            | Type               | Description
+	|-------------------------------------------
+	| comment_symbols | table              | 文件类型注释符号表
+	| max_time        | number             | 延迟分析时间（毫秒）
+	| im_id           | { en: integer, ... } | 输入法ID映射表
+	| im_tool_path    | string             | im-select.exe 路径
+
+	插入模式下光标移动时（CursorMovedI）：
+	1. 检测是否移出当前语法范围
+	2. 必要时重新分析并切换输入法
+
+------------------------------------------------------------------------------
+	F.nvim_insert_leave_listen(comment_symbols, im_id, im_tool_path) -> nil
+
+	| Name            | Type               | Description
+	|-------------------------------------------
+	| comment_symbols | table              | 文件类型注释符号表
+	| im_id           | { en: integer, ... } | 输入法ID映射表
+	| im_tool_path    | string             | im-select.exe 路径
+
+	退出插入模式时（InsertLeave）：
+	1. 强制切换为英文输入法
+	2. 清除所有语法分析缓存
+
+------------------------------------------------------------------------------
+	Orc.re_set_orc_flags(win) -> nil
+
+	| Name | Type    | Description
+	|------------------------------
+	| win  | integer | 窗口ID
+
+	重置协调器事件标志（清空 events 表）。
+
+------------------------------------------------------------------------------
+	Orc.unload_orc_immediate() -> nil
+
+	停止当前窗口所有延迟任务（不删除缓存）。
+
+------------------------------------------------------------------------------
+	Orc.init_orc_cache_immediate() -> nil
+
+	初始化当前窗口的协调器缓存（若不存在）。
+
+------------------------------------------------------------------------------
+	Orc.del_orc_cache_immediate() -> nil
+
+	停止所有延迟任务并删除当前窗口的协调器缓存。
+
+------------------------------------------------------------------------------
+	Orc.schedule_orc(ev, max_time, opts) -> nil
+
+	| Name     | Type    | Description
+	|-------------------------------------------
+	| ev       | table   | 事件表（需包含 event 字段）
+	| max_time | number  | 延迟执行时间（毫秒）
+	| opts     | table   | 配置参数表
+
+	协调器核心调度函数：
+	1. 执行立即回调（若存在）
+	2. 延迟调度延时回调（若存在）
+
+------------------------------------------------------------------------------
+	Orc.run_orc_immediate(ev, win, opts) -> nil
+
+	| Name | Type    | Description
+	|-------------------------------------------
+	| ev   | table   | 事件表
+	| win  | integer | 窗口ID
+	| opts | table   | 配置参数表
+
+	执行注册的立即回调函数。
+
+------------------------------------------------------------------------------
+	Orc.run_orc_schedule(ev, win, opts) -> nil
+
+	| Name | Type    | Description
+	|-------------------------------------------
+	| ev   | table   | 事件表
+	| win  | integer | 窗口ID
+	| opts | table   | 配置参数表
+
+	执行注册的延迟回调函数（单次仅允许一个任务运行）。
+
+------------------------------------------------------------------------------
+
+
+init.lua													*winime-init*
+-----====================================================================-----
+	M.mearge_user_config(opts) -> table
+
+	| Name | Type  | Description
+	|------------------------------
+	| opts | table | 用户配置表
+
+	合并用户配置与默认配置：
+	1. 加载语言文件（路径：`winime.language.[user_language]`）
+	2. 解析 `im_tool_path` 为绝对路径
+	返回合并后的完整配置表
+
+------------------------------------------------------------------------------
+	M.init_config(opts) -> table
+
+	| Name | Type  | Description
+	|------------------------------
+	| opts | table | 用户配置表
+
+	初始化配置（带缓存机制）：
+	1. 检查缓存是否需要更新（`~/.local/share/nvim/winime/` 下的配置文件）
+	2. 自动检测输入法（若启用 `method_auto_detect`）
+	3. 校验 Neovim 版本
+	返回最终配置表
+
+------------------------------------------------------------------------------
+	M.setup(opts) -> nil
+
+	| Name | Type  | Description
+	|------------------------------
+	| opts | table | 用户配置表
+
+	主入口函数，功能包括：
+	1. 初始化配置和日志
+	2. 根据配置启用以下自动命令：
+	   - BufEnter：选择语法分析模式（String/TreeSitter/Auto）
+	   - CursorMoved：更新普通模式光标缓存
+	   - VimEnter：延迟切换英文输入法
+	   - InsertEnter/Leave：处理插入模式输入法切换
+	   - TextChangedI/CursorMovedI：延迟分析输入内容
+
+------------------------------------------------------------------------------
+
+
+==============================================================================
+7. FAQ            											*winime-faq*
+
+    Q: 首次启动时自动探测输入法失败怎么办？
+    A: 请检查系统是否安装了至少两种系统输入法。
+       如果确认已安装，可以尝试删除缓存目录：
+           ~/AppData/Local/nvim-data/winime
+       然后重新启动 Neovim。
+
+    Q: 如何优化 Winime 的启动时长？
+    A: 若希望避免 Winime 随 Neovim 一同启动，可在 lazy.nvim 配置中为其指定其他启动事件。
+        注意：Winime 需要依赖特定事件完成运行时数据初始化，擅自修改启动事件可能导致插件功能异常。
+        相关问题排查请参考 FAQ 中「🟡 修改启动条件后插件报错？」章节。
+
+    Q: 修改 Winime 的启动条件后，出现报错无法使用？
+    A: Winime 依赖一系列自动命令事件来完成初始化与分析：
+          - BufEnter、BufNewFile：决定分析模式
+          - CursorMoved：追踪光标位置
+          - InsertEnter、TextChangedI、CursorMovedI、InsertLeave：
+            初始化 runtime、更新标记、处理数据
+       请确保 Winime 在这些事件触发之前已经正确加载。
+
+    Q: Winime 支持 Mac、Linux 系统吗？
+    A: Winime 底层输入切换基于 [im-select](https://github.com/daipeihust/im-select)。
+       Windows 下默认使用 `im-select.exe`。
+       Mac、Linux 用户需要：
+          - 替换 `lua/winime/tools/im-select.exe` 为对应平台的工具
+          - 重写 `lua/winime/tools/method.lua` 中的 `InputMethodChanged` 函数
+
+    Q: Winime 会收集我的敏感信息吗？
+    A: 不会。
+       - String 分析模式下，Winime 会在 Insert 模式收集按键输入，
+         仅用于文件语法分析。
+       - 日志仅保存在本地：
+           ~/AppData/Local/nvim-data/winime/winime.log
+           ~/AppData/Local/nvim-data/winime/winime.log.old.log
+       - Winime 不具备联网功能，不会上传或分享任何数据。
+
+    Q: Winime 支持哪些文件类型？
+    A: 默认支持：
+          lua, python, C, C++, Java, C#, Go, Rust, Swift,
+          JavaScript, TypeScript, Shell (bash, sh, zsh), SQL,
+          HTML, XML, Markdown, YAML, TOML, PHP
+       你可以通过用户命令 `:WinimeFileTypeAvaliable`
+       查看完整支持列表。
+       对于不支持的语言，可以在 `opts.comment_symbols`
+       中手动添加注释符号配置。
+
+==============================================================================
+8. Future													*winime-future*
+
+	未来版本的 Winime 将增加对 **标点符号的统一替换功能**：
+		- Insert 模式下输入的中文标点符号将会被自动替换为对应的英文标点。
+		- 该功能旨在避免代码编写过程中因全角/半角标点混用而导致的语法错误，
+		  提高代码可读性与一致性。
+
+	该功能仍在开发计划中，欢迎用户提出更多改进建议或提交 PR。
+
+	仍在考虑中的:
+		添加Mac,Linux 系统支持
+
+==============================================================================
+9. License        											*winime-license*
+                                许可证
+
+    Winime 项目基于 GNU General Public License version 3 (GPLv3) 发布。
+
+    1. 核心许可证
+
+        本项目使用 GNU 通用公共许可证第三版 (GPLv3)。
+        版权所有 (C) 2025 十万水星 (StellarDeca)
+        版权所有 (C) 2007 Free Software Foundation, Inc.
+
+        GPLv3 是一个自由软件许可证，保障用户以下自由：
+            - 运行软件的自由
+            - 学习和修改软件源代码的自由
+            - 重新分发软件副本的自由
+            - 发布修改版软件的自由
+
+    2. 基本条款
+
+        您可以根据 GPLv3 条款：
+            - 自由使用、修改和分发本软件
+            - 用于个人或商业目的
+            - 需要保留原始版权声明和许可证信息
+
+        您必须：
+            - 在分发时提供完整的源代码
+            - 保持相同的许可证条款（GPLv3）
+            - 明确标注所做的修改
+
+    3. 第三方组件
+
+        本项目包含第三方组件：
+            - im-select.exe：来自 im-select 项目，使用 MIT 许可证
+
+        MIT 许可证组件位于：
+            LICENSES/im-select/LICENSE
+
+    4. 无担保声明
+
+        本程序不提供任何担保，在适用法律允许的范围内，不承担任何明示或暗示的担保责任，
+    包括但不限于适销性和特定用途适用性的担保。
+
+
+    5. 完整许可证文本
+
+        完整的 GPLv3 许可证文本请参阅：
+            LICENSE
+
+        或者在线查看：
+            https://www.gnu.org/licenses/gpl-3.0.html
+
+
+    6. 如何应用许可证到您的代码
+
+        如果您修改或扩展了 Winime，请在每个源文件头部添加(当然,这并不是必须的)：
+
+        >
+        Copyright (C) 2025 十万水星 (StellarDeca)
+
+          This program is free software: you can redistribute it and/or modify
+        it under the terms of the GNU General Public License as published by
+        the Free Software Foundation, either version 3 of the License, or
+        (at your option) any later version.
+
+          This program is distributed in the hope that it will be useful,
+        but WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        GNU General Public License for more details.
+
+          You should have received a copy of the GNU General Public License
+        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+        <
+
+        您必须继续将 GPLv3 协议应用到您的新项目中(有一些例外情况,具体请参考LICENSE文件),
+        在原有版权声明的基础上,添加您自己的版权声明:
+            ```text
+            Copyright (C) <Year> <Your Name>
+            ```
+
+    7. 联系信息
+
+        项目主页: https://github.com/StellarDeca/winime.nvim
+        作者联系: https://github.com/StellarDeca
+
+
