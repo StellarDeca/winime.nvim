@@ -64,6 +64,46 @@
 </table>
 
 
+## ⚠️ 要求与兼容性
+
+在使用 Winime 之前，请确保您的环境满足以下要求：
+
+### 🖥️ 系统要求
+
+**必须使用 Windows 操作系统**  
+![Windows OS](https://img.shields.io/badge/Windows-11/10-0078D4?style=for-the-badge&logo=windows)
+
+> **注意**: 目前暂不支持 macOS 和 Linux 系统
+
+### 📟 Neovim 版本
+
+**Neovim 0.10.0 或更高版本**  
+![Neovim Version](https://img.shields.io/badge/Neovim-%E2%89%A50.10-57A143?style=for-the-badge&logo=neovim&logoColor=white&labelColor=302D41)
+<br>如果版本过低，请前往官网下载最新版本：
+[Download Neovim](https://github.com/neovim/neovim/releases)
+
+### ⌨️ 输入法配置
+
+**系统必须安装至少 2 种输入法**  
+（一种其它语言输入法 + 一种英文英文输入法）
+
+| 推荐配置      | 示例        |
+|-----------|-----------|
+| **其它输入法** | 微软拼音、微软五笔 |
+| **英文输入法** | 美国英语、英国英语 |
+
+<center><img src="./WinimeInputMethod.png" alt="Winime Input Method"/></center>
+
+### 🔄 输入法兼容性
+
+| 输入法              | 兼容性     | 推荐度   |
+|------------------|---------|-------|
+| **系统自带输入法**      | ✅ 优秀    | ⭐⭐⭐⭐⭐ |
+| **第三方输入法**       | ⚠️ 有限支持 | ⭐⭐    |
+| **统一输入法的不同输入模式** | ❌ 完全不支持 |       |
+> **建议**: 为确保最佳体验，请优先使用 Windows 自带的**微软输入法**
+
+
 ## 📦 安装
 ### 使用 [lazy.nvim](https://github.com/folke/lazy.nvim)
 ```lua
