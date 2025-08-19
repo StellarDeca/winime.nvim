@@ -1,0 +1,18 @@
+{
+  "runtime": {
+    "version": "LuaJit",
+    "path": [
+		"?.lua",
+		"?/init.lua",
+		"lua/?.lua",
+		"lua/?/init.lua",
+	],
+  },
+  "completion": {
+    "enable": true,
+    "callSnippet": "Both"
+  },
+  "workspace": {
+    "checkThirdParty": false,
+  }
+}
