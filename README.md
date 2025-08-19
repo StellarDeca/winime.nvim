@@ -100,7 +100,7 @@
 |------------------|---------|-------|
 | **系统自带输入法**      | ✅ 优秀    | ⭐⭐⭐⭐⭐ |
 | **第三方输入法**       | ⚠️ 有限支持 | ⭐⭐    |
-| **统一输入法的不同输入模式** | ❌ 完全不支持 |       |
+| **同一输入法的不同输入模式** | ❌ 完全不支持 |       |
 > **建议**: 为确保最佳体验，请优先使用 Windows 自带的**微软输入法**
 
 
@@ -146,11 +146,11 @@ use {
 
 ### 分析模式说明
 
-|        模式         | 说明       | 优点        | 缺点                              |
-|:-----------------:|:---------|:----------|:--------------------------------|
-|    🤖 **Auto**    | 自动选择最佳模式 | 智能切换，最佳体验 | 需要 TreeSitter                   |
-| 🌲 **TreeSitter** | 基于语法树分析  | 精确度高      | 需要 TreeSitter 支持, 对于大型文件存在性能问题  |
-|   📝 **String**   | 基于字符串模式  | 无依赖       | 精确度相对较低, 对于中大型文件存在性能问题,精度略微存在不足 |
+|        模式         | 说明       | 优点        | 缺点                             |
+|:-----------------:|:---------|:----------|:-------------------------------|
+|    🤖 **Auto**    | 自动选择最佳模式 | 智能切换，最佳体验 | 需要 TreeSitter                  |
+| 🌲 **TreeSitter** | 基于语法树分析  | 精确度高      | 需要 TreeSitter 支持, 对于大型文件存在性能问题 |
+|   📝 **String**   | 基于字符串模式  | 无依赖       | 对于中大型文件存在性能问题,精度略微存在不足         |
 
 ## 🎮 使用
 
@@ -204,8 +204,8 @@ Winime 需要依赖特定事件完成运行时数据初始化，擅自修改启�
 
 默认仅支持 Windows（使用 `im-select.exe`）。要支持其他平台：
 1. 替换 `lua/winime/tools/im-select.exe` 为对应平台工具
-2. 在 `lua/winime/tools/method.lua` 中实现平台调用接口
-3. 检查输入法区域ID是否适配
+2. 在 `lua/winime/tools/method.lua` 中实现对应平台的lua method api
+3. 检查输入法区域ID是否适配对应平台
 4. 欢迎提交 PR 贡献代码 💪
 </details>
 
@@ -231,7 +231,7 @@ Winime 需要依赖特定事件完成运行时数据初始化，擅自修改启�
 ### 💡 仍在计划中
 - [ ] 📊 多系统支持
   - 🐧 Linux 支持
-  - 🍎 macOS 支持
+  - 🍎 MacOS 支持
 
 
 ## 🤝 贡献
@@ -240,7 +240,7 @@ Winime 需要依赖特定事件完成运行时数据初始化，擅自修改启�
 
 ### 💖 贡献者
 <a href="https://github.com/StellarDeca/winime.nvim/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=StellarDeca/winime.nvim"  alt="Winime Art Font"/>
+    <img src="https://contrib.rocks/image?repo=StellarDeca/winime.nvim"  alt="Winime Author"/>
 </a>
 </div>
 
@@ -252,7 +252,7 @@ Winime 需要依赖特定事件完成运行时数据初始化，擅自修改启�
 
 <div align="center">
 
-**如果这个项目对你有帮助，请给个 ⭐ Star 支持一下！**
+**如果这个项目对你有帮助，请给一个 ⭐ Star 支持一下！**
 <br>
 Made with ❤️ by [StellarDeca](https://github.com/StellarDeca)
 </div> 
