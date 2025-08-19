@@ -1,0 +1,28 @@
+# Use LF for end
+* text=auto eol=lf
+
+# fieltypes
+*.lua text
+*.txt text
+*.md text
+*.json text
+*.toml text
+*.xml text
+*.txt text
+doc/** text
+README* text
+
+.luarc.json text
+stylua.toml text
+.nvim.lua text
+
+# Unused
+*.png binary
+*.gif binary
+*.exe binary
+*.iml binary
+
+# Other fielypes
+LICENSE text
+LICENSES/** text
+

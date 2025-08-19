@@ -1,0 +1,48 @@
+# IDE 配置文件
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+*.un~
+
+# Neovim 临时文件
+.session
+.netrwhist
+*.tmp
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# 临时构建文件
+/target/
+/build/
+
+# 日志文件
+*.log
+logs/
+
+# 依赖目录
+deps/
+.deps/
+
+# 测试相关临时文件
+/test-output/
+*.result
+
+# 文档生成器输出
+/doc-tags
+doc/*.html
+doc/tags
+
+# 本地配置文件
+.local.vim
+.local.lua
+
+# 备份文件
+*.bak
+*.backup
+
