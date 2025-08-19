@@ -1079,7 +1079,7 @@ space/orchestrator_runtime.lua
 ------------------------------------------------------------------------------
 
 
-(3).lua/winime/apis:										*winime-apis*
+(3).lua/winime/apis:										*winime-comment-apis*
 -----====================================================================-----
 
 method_auto_detect.lua
