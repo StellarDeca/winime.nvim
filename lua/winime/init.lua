@@ -157,8 +157,6 @@ function M.setup(opts)
 			winime.input_method.im_tool_path
 		)
 	end
-
-	require("nvim-treesitter")
 end
 
 return M

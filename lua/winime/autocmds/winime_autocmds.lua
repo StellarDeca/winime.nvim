@@ -122,11 +122,7 @@ end
 function F.nvim_buf_enter_listen(winime)
 	local analysis_mode = winime.winime_core.grammer_analysis_mode
 
-	if analysis_mode == "String" then
-		---== String 分析模式
-		Orc.immediate_callback = StringAutoCmdsCallback.immediate_callback
-		Orc.schedule_callback = StringAutoCmdsCallback.schedule_callback
-	elseif analysis_mode == "TreeSitter" then
+	if analysis_mode == "TreeSitter" then
 		---== TreeSitter 分析模式
 		Orc.immediate_callback = TreeSitterAutoCmdsCallback.immediate_callback
 		Orc.schedule_callback = TreeSitterAutoCmdsCallback.schedule_callback
@@ -163,7 +159,9 @@ function F.nvim_buf_enter_listen(winime)
 			end,
 		})
 	else
-		vim.notify("无效的模式配置!")
+		---== String 分析模式
+		Orc.immediate_callback = StringAutoCmdsCallback.immediate_callback
+		Orc.schedule_callback = StringAutoCmdsCallback.schedule_callback
 	end
 end
 
