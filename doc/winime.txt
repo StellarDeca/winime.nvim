@@ -407,6 +407,7 @@ require("winime").setup({
     │  README_EN.md
     │  stylua.toml
     │  WinimeArtFont.png
+    │  WinimeInputMethod.png
     │  WinimeTeach.gif
     │
     ├─.idea
