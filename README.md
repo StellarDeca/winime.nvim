@@ -28,7 +28,7 @@
     <img src="https://img.shields.io/badge/Neovim-%E2%89%A50.10-57A143?style=for-the-badge&logo=neovim&logoColor=white&labelColor=302D41"  alt="Neovim Logo"/>
 </p></div>
 
-🌍 [English](./README_EN.md) | [简体中文](./README.md)
+🌍 简体中文 | [English](./README_EN.md)
 
 ---
 
