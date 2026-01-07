@@ -32,7 +32,9 @@
 
 ---
 
-⚠️ 本项目已停止维护，所有功能均迁移至新项目：[lazyime.nvim](https://github.com/StellarDeca/lazyime.nvim)
+## ⚠️ 本项目已停止维护，所有功能均迁移至新项目：[lazyime.nvim](https://github.com/StellarDeca/lazyime.nvim)
+
+---
 
 ## 👋 欢迎使用 Winime！
 **Winime** 是一款专为 Neovim 设计的智能输入法切换插件，能够根据编辑上下文和编辑模式自动切换系统输入法，
